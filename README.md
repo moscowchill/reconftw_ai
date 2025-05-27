@@ -1,12 +1,50 @@
 # ReconFTW-AI
 
-Integrate a local LLM with ReconFTW to interpret pentesting results by category (tested with `mistral:7b`, `llama3:8b`, `deepseek-r1:8b`, and `qwen2.5-coder:latest`).
+Integrate LLMs with ReconFTW to interpret pentesting results by category. Supports both local models (via Ollama) and remote APIs including **Anthropic's Claude 4** and **OpenAI's GPT-4**.
 
 ## 🧠 What does it do?
 
-It analyzes ReconFTW outputs (`osint/`, `subdomains/`, `hosts/`, `webs/`) and generates a report using a local LLM, classifying the results based on the type of audience: executive, brief summary, or offensive bug bounty style. Prompts are loaded dynamically from a `prompts.json` file for easy customization.
+It analyzes ReconFTW outputs (`osint/`, `subdomains/`, `hosts/`, `webs/`) and generates a report using your choice of LLM (local or remote), classifying the results based on the type of audience: executive, brief summary, or offensive bug bounty style. Prompts are loaded dynamically from a `prompts.json` file for easy customization.
+
+## 🤖 Available Models
+
+### Anthropic (Claude) - Best for security analysis:
+- `claude-4-sonnet-20250522` (Recommended - Latest Claude 4, most capable)
+- `claude-4-opus-20250522` (Most powerful Claude 4, but slower)
+- `claude-3-5-haiku-20241022` (Fast and cost-effective)
+- `claude-3-5-sonnet-20241022` (Previous generation, still very capable)
+
+### OpenAI:
+- `gpt-4` (Most capable)
+- `gpt-4-turbo` (Faster GPT-4)
+- `gpt-3.5-turbo` (Fast and cost-effective)
+
+### Ollama (Local):
+- `llama3:8b`
+- `mistral:7b`
+- `deepseek-r1:8b`
+- `qwen2.5-coder:latest`
+- Any other Ollama-supported model
 
 ## 📦 Installation
+
+### Option 1: For Remote API Support (Claude 4, GPT-4)
+
+1. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+2. Set up your API key (choose one):
+```bash
+# For Anthropic Claude
+export ANTHROPIC_API_KEY="your-api-key-here"
+
+# For OpenAI
+export OPENAI_API_KEY="your-api-key-here"
+```
+
+### Option 2: For Local Ollama Support
 
 1. Install Ollama:
 ```bash
@@ -27,21 +65,45 @@ pip install -r requirements.txt
 
 ## 🧪 Usage
 
-Basic usage:
+### Using Claude 4 (Recommended for best results):
 ```bash
 python reconftw_ai.py \
   --results-dir /path/to/reconftw_results \
   --output-dir /path/to/output \
+  --provider anthropic \
+  --model claude-4-sonnet-20250522 \
+  --output-format md \
+  --report-type bughunter
+```
+
+### Using GPT-4:
+```bash
+python reconftw_ai.py \
+  --results-dir /path/to/reconftw_results \
+  --output-dir /path/to/output \
+  --provider openai \
+  --model gpt-4 \
+  --output-format md \
+  --report-type executive
+```
+
+### Using Local Ollama (Original):
+```bash
+python reconftw_ai.py \
+  --results-dir /path/to/reconftw_results \
+  --output-dir /path/to/output \
+  --provider ollama \
   --model llama3:8b \
   --output-format md \
-  --report-type bughunter \
-  --prompts-file prompts.json
+  --report-type brief
 ```
 
 ### Arguments:
 - `--results-dir`: Input directory with `osint/`, `subdomains/`, `hosts/`, `webs/` (default: `./reconftw_output`)
 - `--output-dir`: Where to save the report (default: `./reconftw_ai_output`)
-- `--model`: Ollama model to use (default: `llama3`)
+- `--provider`: LLM provider: `ollama`, `anthropic`, or `openai` (default: `ollama`)
+- `--model`: Model name to use (e.g. `llama3:8b`, `claude-4-sonnet-20250522`, `gpt-4`)
+- `--api-key`: API key for remote providers (optional if using environment variables)
 - `--output-format`: Output format: `txt` or `md` (default: `txt`)
 - `--report-type`: Report style: `executive`, `brief`, or `bughunter` (default: `executive`)
 - `--prompts-file`: JSON file containing prompt templates (default: `prompts.json`)
