@@ -277,7 +277,24 @@ def validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
     return True
 
 def main():
-    parser = argparse.ArgumentParser(description="ReconFTW-AI: Use LLMs to interpret ReconFTW results")
+    parser = argparse.ArgumentParser(
+        description="ReconFTW-AI: Use LLMs to interpret ReconFTW results",
+        epilog="""
+Examples:
+  # Using local Ollama model:
+  python reconftw_ai.py --results-dir ./reconftw_output --model llama3:8b --report-type executive
+
+  # Using Claude 4 (requires ANTHROPIC_API_KEY environment variable):
+  python reconftw_ai.py --results-dir ./reconftw_output --provider anthropic --model claude-4-sonnet-20250522 --report-type bughunter
+
+  # Using GPT-4 with API key:
+  python reconftw_ai.py --results-dir ./reconftw_output --provider openai --model gpt-4 --api-key "sk-..." --output-format md
+
+  # Custom output directory and prompts file:
+  python reconftw_ai.py --results-dir ./scan_results --output-dir ./reports --prompts-file custom_prompts.json
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--results-dir", default=DEFAULT_RECONFTW_RESULTS_DIR, help="Directory with ReconFTW results.")
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR, help="Where to save the analysis.")
     parser.add_argument("--model", default=DEFAULT_MODEL_NAME, help="Model name to use (e.g. llama3, claude-4-sonnet-20250522, gpt-4).")
