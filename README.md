@@ -189,5 +189,25 @@ The `prompts.json` file defines the LLM prompts for each report type and categor
 - **Staging Endpoint**: Exposed admin interface; attempt auth bypass or XSS.
 ```
 
+## 💰 Cost Protection Features
+
+When using remote APIs (Anthropic/OpenAI), the tool includes several safeguards:
+
+1. **File Size Limits**:
+   - Individual files > 10MB are skipped
+   - Total data per category limited to 50MB
+   - Files are truncated at ~100KB of text
+
+2. **Cost Estimation**:
+   - Estimates API costs before processing
+   - Shows total token count
+   - Prompts for confirmation if cost > $1.00
+
+3. **Data Warnings**:
+   - Notifies when files are skipped due to size
+   - Shows truncation messages in output
+
+These limits prevent unexpectedly high API costs from large reconnaissance outputs while still providing comprehensive analysis.
+
 ## 🤝 Contributions
 Pull requests and issues are welcome! To contribute new prompts, update the `prompts.json` file and test with various ReconFTW outputs.

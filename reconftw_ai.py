@@ -172,9 +172,12 @@ def ensure_model_available(model_name):
         print(f"[ERROR] Could not verify or pull model: {e}")
         sys.exit(1)
 
-def read_files(category: str, results_dir: str) -> str:
+def read_files(category: str, results_dir: str, max_file_size_mb: int = 10, max_total_size_mb: int = 50) -> str:
     combined_data = ""
     category_dir = os.path.join(results_dir, category)
+    total_size = 0
+    max_file_size = max_file_size_mb * 1024 * 1024  # Convert to bytes
+    max_total_size = max_total_size_mb * 1024 * 1024  # Convert to bytes
 
     if not os.path.isdir(category_dir):
         return f"[Error] Directory {category_dir} does not exist."
@@ -184,9 +187,26 @@ def read_files(category: str, results_dir: str) -> str:
     for file_path in file_paths:
         if os.path.isfile(file_path):
             relative_path = os.path.relpath(file_path, results_dir)
+            
+            # Check file size before reading
+            file_size = os.path.getsize(file_path)
+            if file_size > max_file_size:
+                combined_data += f"--- {relative_path} ---\n[Warning] File too large ({file_size / 1024 / 1024:.1f}MB > {max_file_size_mb}MB limit). Skipping to prevent high API costs.\n"
+                continue
+            
+            # Check if we're exceeding total size limit
+            if total_size + file_size > max_total_size:
+                combined_data += f"\n[Warning] Total data size limit reached ({max_total_size_mb}MB). Remaining files in {category} skipped.\n"
+                break
+            
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
-                    combined_data += f"--- {relative_path} ---\n{f.read().strip()}\n"
+                    content = f.read().strip()
+                    # Truncate individual file content if still too large
+                    if len(content) > 100000:  # ~100KB of text
+                        content = content[:100000] + "\n[... truncated to prevent high API costs ...]"
+                    combined_data += f"--- {relative_path} ---\n{content}\n"
+                    total_size += file_size
             except Exception as e:
                 combined_data += f"[Error] Failed to read {relative_path}: {str(e)}\n"
 
@@ -226,9 +246,35 @@ def save_results(results: Dict[str, str], output_dir: str, model_name: str, prov
 
     print(f"[*] Results saved to '{output_file}'")
 
+def estimate_tokens(text: str) -> int:
+    """Rough estimation of tokens (1 token ≈ 4 characters)"""
+    return len(text) // 4
+
+def estimate_cost(tokens: int, provider: str, model: str) -> float:
+    """Estimate API cost based on token count"""
+    # Approximate costs per 1M tokens (input + output)
+    cost_per_million = {
+        "anthropic": {
+            "claude-4-opus-20250522": 15.0,
+            "claude-4-sonnet-20250522": 3.0,
+            "claude-3-5-haiku-20241022": 0.25,
+            "claude-3-5-sonnet-20241022": 3.0,
+        },
+        "openai": {
+            "gpt-4": 30.0,
+            "gpt-4-turbo": 10.0,
+            "gpt-3.5-turbo": 0.5,
+        }
+    }
+    
+    if provider in cost_per_million and model in cost_per_million[provider]:
+        return (tokens / 1_000_000) * cost_per_million[provider][model]
+    return 0.0
+
 def analyze_reconftw_results(results_dir: str, provider: LLMProvider, report_type: str, base_prompts: Dict) -> Dict[str, str]:
     results = {}
     all_data = ""
+    total_tokens = 0
 
     with ThreadPoolExecutor() as executor:
         futures = {
@@ -241,6 +287,22 @@ def analyze_reconftw_results(results_dir: str, provider: LLMProvider, report_typ
             category = futures[future]
             raw_data = future.result()
             raw_data_per_category[category] = raw_data
+            total_tokens += estimate_tokens(raw_data)
+
+    # Estimate costs for remote APIs
+    if provider.__class__.__name__ in ["AnthropicProvider", "OpenAIProvider"]:
+        provider_name = provider.__class__.__name__.replace("Provider", "").lower()
+        estimated_cost = estimate_cost(total_tokens * 2, provider_name, provider.model_name)  # x2 for input+output
+        
+        if estimated_cost > 1.0:
+            print(f"\n[WARNING] Estimated API cost: ~${estimated_cost:.2f}")
+            print(f"[WARNING] Total data size: ~{total_tokens:,} tokens")
+            response = input("This might be expensive. Continue? (y/N): ")
+            if response.lower() != 'y':
+                print("[*] Analysis cancelled by user.")
+                sys.exit(0)
+        else:
+            print(f"[*] Estimated API cost: ~${estimated_cost:.2f}")
 
     # Process categories sequentially to avoid rate limits
     for category in CATEGORIES:
